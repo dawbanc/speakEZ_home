@@ -1,0 +1,136 @@
+ 
+esphome:
+  name: "esp-mic-test"
+  friendly_name: esp_test
+  on_boot:
+    - priority: -100
+      then:
+        - wait_until: api.connected
+        - delay: 10s
+        #- if:
+        #    condition:
+        #      switch.is_on: use_wake_word
+        #    then:
+        #      - voice_assistant.start_continuous:
+
+esp32:
+  board: esp32doit-devkit-v1
+  framework:
+    type: arduino
+    #type: esp-idf
+    #version: recommended
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "j8JltVDIBYE4ohA2q1OaewYOMJQXYYlshTvZEg/gejQ="
+
+ota:
+  password: "c358a4e64977ba076ee86d38ce9f2fd2"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: 192.168.14.1
+    gateway: 192.168.1.1
+    subnet: 255.255.0.0
+  use_address: 192.168.14.1
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esp-Test Fallback Hotspot"
+    password: "aQ05eKn5Irgn"
+
+captive_portal:
+
+mdns:
+  disabled: true
+
+output:
+  - platform: gpio
+    id: "lil_led"
+    pin: 13
+  - platform: gpio
+    id: "va_status"
+    pin: 26
+
+light:
+  - platform: binary
+    output: "lil_led"
+    name: "little_led"
+  - platform: binary
+    output: "va_status"
+    id: "va_status_light"
+
+
+i2s_audio:
+  i2s_lrclk_pin: 15
+  i2s_bclk_pin: 14
+  #l/r connected to gnd
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    adc_type: external
+    i2s_din_pin: 32
+    pdm: False
+    channel: left
+
+speaker:
+  - platform: i2s_audio
+    id: small_speaker
+    dac_type: external
+    i2s_dout_pin: 25
+    mode: mono
+
+voice_assistant:
+  microphone: mic
+  speaker: small_speaker
+  use_wake_word: true # temp disable while debugging mic
+  noise_suppression_level: 1
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  id: assist
+  on_listening:
+    light.turn_on: va_status_light
+  on_end:
+    - light.turn_off: va_status_light
+
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: 23
+    name: activate va
+    id: activate_va
+    on_press:
+        - voice_assistant.start_continuous
+    on_release:
+        - voice_assistant.stop:
+
+
+#switch:
+#  - platform: gpio
+#    pin:
+#      number: 23
+#      mode:
+#        input: True
+#    name: Use wake word
+#    id: use_wake_word
+#    restore_mode: RESTORE_DEFAULT_ON
+#    entity_category: config
+#    on_turn_on:
+#      - lambda: id(assist).set_use_wake_word(true);
+#      - if:
+#          condition:
+#            not:
+#              - voice_assistant.is_running
+#          then:
+#            - voice_assistant.start_continuous
+#    on_turn_off:
+#      - voice_assistant.stop
+#      - lambda: id(assist).set_use_wake_word(false);
